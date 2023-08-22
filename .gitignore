@@ -1,0 +1,6 @@
+procdata/*
+rawdata/*
+
+!rawdata/intralipid_ref1percent_20140829.txt
+!rawdata/intralipid_trans1percent_20140829.txt
+!rawdata/Sphere_calibration140829.txt
