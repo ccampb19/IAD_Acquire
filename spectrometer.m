@@ -29,7 +29,7 @@ classdef spectrometer
         function [obj,status] = setIntegrationTime(obj)
         end
 
-        function status = acquire(obj)
+        function data = acquire(obj)
         end
 
         function obj = closeSpec(obj)

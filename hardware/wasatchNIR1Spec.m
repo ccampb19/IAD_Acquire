@@ -1,6 +1,8 @@
 classdef wasatchNIR1Spec < spectrometer
     %WASATCHNIR1SPEC spectrometer class for Wasatch NIR-1
 
+    % Properties and method prototypes are listed in spectrometer.m
+
     methods
         function obj = wasatchNIR1Spec()
             %WASATCHNIR1SPEC Construct an instance of this class
@@ -29,6 +31,10 @@ classdef wasatchNIR1Spec < spectrometer
 
         function data = acquire(obj)
             data = obj.Handle.getSpectrum();
+        end
+
+        function obj = closeSpec(obj)
+            obj.Driver.closeAllSpectrometers()
         end
 
     end

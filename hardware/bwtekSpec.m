@@ -1,6 +1,8 @@
 classdef bwtekSpec < spectrometer
     %BWTEKSPEC spectrometer class for B&W TEK BTC621E-1024 (very old).
 
+    % Properties and method prototypes are listed in spectrometer.m
+
     methods
         function obj = bwtekSpec()
             %BWTEKSPEC Construct an instance of this class
