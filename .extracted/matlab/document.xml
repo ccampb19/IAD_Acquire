@@ -1,0 +1,1062 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no" ?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:pPr><w:pStyle w:val="code"/></w:pPr><w:r><w:t><![CDATA[classdef IAD_acquire < matlab.apps.AppBase
+
+    % Properties that correspond to app components
+    properties (Access = public)
+        IAD_UIFigure                    matlab.ui.Figure
+        TabGroup                        matlab.ui.container.TabGroup
+        AcquisitionTab                  matlab.ui.container.Tab
+        SaturatedLampLabel              matlab.ui.control.Label
+        IntegrationTimemsEditFieldLabel  matlab.ui.control.Label
+        OutputNameEditFieldLabel        matlab.ui.control.Label
+        SaturatedLamp                   matlab.ui.control.Lamp
+        DarkLamp                        matlab.ui.control.Lamp
+        ConnectedLamp                   matlab.ui.control.Lamp
+        ConnectButton                   matlab.ui.control.Button
+        SaveButton                      matlab.ui.control.Button
+        OutputNameEditField             matlab.ui.control.EditField
+        AcquireDataButton               matlab.ui.control.Button
+        AutoexposeButton                matlab.ui.control.Button
+        AcquireDarkButton               matlab.ui.control.Button
+        InttimeEditField                matlab.ui.control.NumericEditField
+        UIAxes                          matlab.ui.control.UIAxes
+        ProcessingTab                   matlab.ui.container.Tab
+        SystemTypeButtonGroup           matlab.ui.container.ButtonGroup
+        CustomButton                    matlab.ui.control.RadioButton
+        DualButton                      matlab.ui.control.RadioButton
+        SingleButton                    matlab.ui.control.RadioButton
+        RStdListbox                     matlab.ui.control.ListBox
+        StandardReflectanceLabel        matlab.ui.control.Label
+        TransmittanceLabel              matlab.ui.control.Label
+        TMeasListbox                    matlab.ui.control.ListBox
+        ReflectanceListBoxLabel         matlab.ui.control.Label
+        RMeasListbox                    matlab.ui.control.ListBox
+        uipanel1                        matlab.ui.container.Panel
+        StepSizeEditField               matlab.ui.control.NumericEditField
+        StepSizeEditFieldLabel          matlab.ui.control.Label
+        SampleIndexofRefractionEditField  matlab.ui.control.NumericEditField
+        SampleIndexofRefractionEditFieldLabel  matlab.ui.control.Label
+        SampleThicknessmmEditField      matlab.ui.control.NumericEditField
+        SampleThicknessmmEditFieldLabel  matlab.ui.control.Label
+        AnisotropyEditField             matlab.ui.control.NumericEditField
+        AnisotropyEditFieldLabel        matlab.ui.control.Label
+        uipanel2                        matlab.ui.container.Panel
+        SlidesPresentSwitch             matlab.ui.control.Switch
+        SlidesPresentSwitchLabel        matlab.ui.control.Label
+        SlideIndexofRefractionEditField  matlab.ui.control.NumericEditField
+        SlideIndexofRefractionEditFieldLabel  matlab.ui.control.Label
+        SlideThicknessmmEditField       matlab.ui.control.NumericEditField
+        SlideThicknessmmEditFieldLabel  matlab.ui.control.Label
+        SelectDirButton                 matlab.ui.control.Button
+        DataDirectoryText               matlab.ui.control.Label
+        SaveFileNameEditFieldLabel      matlab.ui.control.Label
+        SaveFileNameEditField           matlab.ui.control.EditField
+        ResetButton                     matlab.ui.control.Button
+        CalculateButton                 matlab.ui.control.Button
+        MuspAxes                        matlab.ui.control.UIAxes
+        MuaAxes                         matlab.ui.control.UIAxes
+        RawAxes                         matlab.ui.control.UIAxes
+    end
+
+    
+    properties (Access = private)
+
+        OldPath = ""
+
+        % coefs = struct( ...
+        %     'a0',3.20180e+02,'a1',8.50798e-1, ...
+        %     'a2',-1.09490e-4,'a3',6.30802e-09 ...
+        %     );                      % Calibration coefficients (CAC 230619)
+
+        DataPtr     % Pointer to memory location for collected data
+
+        LampOn = [0, 1, 0];         % Color to indicate ready status
+        LampOff = [0.6, 0.6, 0.6];  % Color to indicate non-ready status
+
+        IadInputFileName="temp.txt" % Overwrite this file to feed iad.exe
+        IadInputHeader="SingleSphereParams" % Contains the header for iad.exe
+
+        IadOutDir = "procdata"
+
+    end
+    
+    properties (Access = public)
+
+        Spec    spectrometer    % Object of "Spectrometer" class
+
+        DarkData (:,1) double
+        RawData (:,1) double
+
+        Initialized (1,1) logical = false % Are we connected?
+        HasDark  (1,1) logical = false % Has valid dark scan been taken?
+        Px       (:,1) double   % Pixel indices. 0:Spec.NumPixels-1
+
+        RawDir   (1,1) string   % Path to folder containing all data files
+        Fnames   (:,1) string   % Filenames in DataDir wihout the ".txt"
+
+        Wv       (:,1) double   % Vector of wavelengths in nm
+        R_sample (:,3) double   % Reflectance spectrum
+        T_sample (:,3) double   % Transmittance spectrum
+        R_std    (:,3) double   % Calibration standard reflectance
+
+        Mr2      (:,1) double   % Corrected reflectance   
+        Mt2      (:,1) double   % Corrected Transmittance
+
+    end
+    
+    methods (Access = private)
+
+        % *****************************************************************
+        % PRIVATE METHODS FOR ACQUISITION TAB
+        % *****************************************************************
+ 
+        function PlotData(app)
+
+            if app.HasDark
+                pdata = app.RawData-app.DarkData;
+                plot(app.UIAxes, app.Spec.WvArray, pdata, 'g')
+                title(app.UIAxes, 'Dark-Corrected Spectrum')
+            else
+                pdata = app.RawData;
+                plot(app.UIAxes, app.Spec.WvArray, app.RawData)
+                title(app.UIAxes, 'Raw Spectrum')
+            end
+            app.UIAxes.YAxis.Exponent = 0;
+            if max(pdata) >= 65500
+                app.SaturatedLamp.Color = app.LampOn;
+            else
+                app.SaturatedLamp.Color = app.LampOff;
+            end
+            
+        end
+
+        function PlotDarkData(app)
+            plot(app.UIAxes, app.Spec.WvArray, app.DarkData, ...
+                "Color", [0.4, 0.4, 0.4])
+            app.UIAxes.YAxis.Exponent = 0;
+            title(app.UIAxes, 'Dark Spectrum')
+        end
+        
+        function EnableAll(app,state)
+
+            [ ...
+            app.InttimeEditField.Enable, ...
+            app.AutoexposeButton.Enable, ...
+            app.AcquireDarkButton.Enable, ...
+            app.AcquireDataButton.Enable, ...
+            app.OutputNameEditField.Enable, ...
+            app.SaveButton.Enable ...
+            ] = deal(state);
+            
+        end
+
+        
+        function d = WaitForSpec(app)
+
+            d = uiprogressdlg(app.IAD_UIFigure, "Message", "Acquiring", ...
+                "Title", "Please Wait", "Value", 1);
+         
+        end
+
+        % *****************************************************************
+        % PRIVATE METHODS FOR PROCESSING TAB
+        % *****************************************************************
+
+        function PopulateListBoxes(app)
+
+            app.sliceDirString;
+
+            d = dir(fullfile(app.RawDir,"*.txt"));
+            vals = string({d.name}').extractBefore('.txt');
+
+            if ~isempty(vals)
+                [app.RMeasListbox.Items, ...
+                    app.TMeasListbox.Items, ...
+                    app.RStdListbox.Items] = deal(vals);
+            else
+                [app.RMeasListbox.Items, ...
+                    app.TMeasListbox.Items, ...
+                    app.RStdListbox.Items] = deal("No Data Found.");
+            end
+
+        end
+
+        function GatherValues(app)
+
+            % Assume, for now, that all files are correctly formatted.
+            app.R_sample = load(fullfile(app.RawDir, ...
+                app.RMeasListbox.Value + ".txt"));
+            app.T_sample = load(fullfile(app.RawDir, ...
+                app.TMeasListbox.Value + ".txt"));
+            app.R_std = load(fullfile(app.RawDir, ...
+                app.RStdListbox.Value + ".txt"));
+            app.Wv = app.R_sample(:,2);
+            
+            %system correction method for single sphere measurements...
+            app.Mr2=(app.R_sample(:,3))./(app.R_std(:,3));
+            app.Mt2=(app.T_sample(:,3))./(app.R_std(:,3));
+
+        end
+
+        
+        function err = VerifyData(app)
+
+            err = [];
+            if isempty(app.RMeasListbox.Value) || ...
+                    isempty(app.TMeasListbox.Value) || ...
+                    isempty(app.RStdListbox.Value)
+                msgbox("Please select three files first.")
+                err = [err, 1];
+            end
+
+        end        
+
+
+        function WriteInputFile(app)
+
+            % Adjust header values to match app
+            outFileName= fullfile(app.IadOutDir, "temp.txt");
+
+            % These replacements all rely on the specified order. As such,
+            % empty lines must be skipped for the replacement to work.
+            header = readlines(app.IadInputHeader,'EmptyLineRule','skip');
+            header(2) = strrep(header(2), "1.33", ...
+                num2str(app.SampleIndexofRefractionEditField.Value));
+            header(4) = strrep(header(4), "2.00", ...
+                num2str(app.SampleThicknessmmEditField.Value));
+            
+            if strcmp(app.SlidesPresentSwitch.Value,"No")
+                header(3) = strrep(header(3),"1.56", "1.0");
+                header(5) = strrep(header(5),"1.23", "0.0");
+            else
+                header(3) = strrep(header(3),"1.56", ...
+                    num2str(app.SlideIndexofRefractionEditField.Value));
+                header(5) = strrep(header(5),"1.23", ...
+                    num2str(app.SlideThicknessmmEditField.Value));
+            end
+                           
+            % Put the data in an array for readability
+            stepsize = app.StepSizeEditField.Value;
+            dataMat = [ ...
+                app.Wv(1:stepsize:end)'; ...
+                app.Mr2(1:stepsize:end)'; ...
+                app.Mt2(1:stepsize:end)'];
+
+            % Write to file
+            writelines(header, outFileName);
+            fid = fopen(outFileName,'a');
+            fprintf(fid,'%f  %f  %f\n', dataMat);
+            fclose(fid);
+
+        end        
+        
+
+        function PlotCorrectedData(app)
+
+            plot(app.RawAxes, app.Wv, app.Mr2, app.Wv, app.Mt2)
+            legend(app.RawAxes, "Reflectance", "Transmittance", ...
+                "Location", "Best")
+            xlabel(app.RawAxes, 'Wavelength (nm)')
+            ylabel(app.RawAxes, 'Calibrated Reflectance/Transmittance')
+            drawnow
+
+        end
+
+
+        function PlotOPs(app)
+
+            fid = fopen(fullfile(app.IadOutDir, ...
+                app.SaveFileNameEditField.Value+"_out.txt"),'r');
+            for i=1:44  %skip first 44 lines in output file (header info)
+                fgetl(fid);
+            end
+            
+            % These file ending chars are a pain.
+            data = nan(ceil(numel(app.Wv)/app.StepSizeEditField.Value),9);
+            idx = 0;
+            while ~feof(fid)
+                idx = idx+1;
+                data(idx,:) = double( ...
+                    string(fgetl(fid)).strip('left'). ...
+                    extractBefore('# *').split);
+            end
+            fclose(fid);
+
+            outwv = data(:,1);
+            mua = data(:,6);
+            musp = data(:,7);
+
+            plot(app.MuaAxes,outwv,mua)
+            xlabel(app.MuaAxes, "Wavelength (nm)")
+            ylabel(app.MuaAxes, "\mu_A (mm^-^1)")
+
+            plot(app.MuspAxes,outwv,musp)
+            xlabel(app.MuspAxes, "Wavelength (nm)")
+            ylabel(app.MuspAxes, "\mu_S' (mm^-^1)")
+            
+        end        
+        
+        function sliceDirString(app)
+
+            % Not sure if this is the best way to slice up the string...
+            txtwid = app.DataDirectoryText.Position(3)/6;
+            words = split(app.RawDir,filesep);
+            splittext = strings(0);
+            while ~isempty(words)
+                lastidx = find(cumsum(strlength(words)+1) <= ...
+                    txtwid,1,'last');
+                splittext = [splittext; ...
+                    words(1:lastidx).join(filesep) + filesep];
+                words = words(lastidx+1:end);
+            end
+
+            app.DataDirectoryText.Text = splittext;            
+
+        end
+
+
+    end
+    
+    methods (Access = public)
+
+        % *****************************************************************
+        % PUBLIC METHODS FOR ACQUISITION TAB
+        % *****************************************************************        
+        
+        function results = Acquire(app)
+    
+            d = app.WaitForSpec;
+            app.Spec = ...
+                app.Spec.setIntegrationTime(app.InttimeEditField.Value);    
+            results = app.Spec.acquire;
+            close(d)
+            
+        end
+        
+        function SetIntTime(app, inttime)           
+
+            inttime = round(inttime);
+            app.InttimeEditField.Value = inttime;
+            app.InttimeEditFieldValueChanged;
+       
+        end
+
+        
+        function status = LoadSpec(app)
+    
+            snames = string({dir('./hardware').name}) ...
+                .extractBefore('Spec.m');
+            snames(ismissing(snames)) = [];
+
+            [idx,tf] = listdlg('ListString',snames, ...
+                'PromptString', 'Please Select a Spectrometer', ...
+                 'SelectionMode','single','ListSize',[160,100]);
+
+            % Need complete logic to handle no selection.
+            % For now, status = 0
+            if ~tf
+                status = 0;
+            else
+                % oogly
+                app.Spec = eval(snames(idx) + "Spec");
+                app.ConnectButton.Enable = "on";
+                status = 1;
+            end
+            
+        end
+    end
+    
+
+    % Callbacks that handle component events
+    methods (Access = private)
+
+        % Code that executes after component creation
+        function startupFcn(app)
+            
+            cd(fileparts(mfilename('fullpath')))
+            app.RawDir = fullfile(pwd,'rawdata');
+            addpath('./hardware/');
+
+            % Acquisition tab:
+            app.LoadSpec;
+
+            app.ConnectedLamp.Color = app.LampOff;
+            app.DarkLamp.Color = app.LampOff;
+
+            % Processing tab:
+            % Attempt to populate listboxes
+            app.PopulateListBoxes;        
+
+        end
+
+        % Button pushed function: AcquireDataButton
+        function AcquireDataButtonPushed(app, event)
+           
+            app.RawData = app.Acquire;
+            app.PlotData;
+
+        end
+
+        % Value changed function: InttimeEditField
+        function InttimeEditFieldValueChanged(app, event)
+            
+            app.DarkLamp.Color = app.LampOff;
+            app.DarkData = zeros(size(app.Px));
+            app.HasDark = false;
+            
+        end
+
+        % Close request function: IAD_UIFigure
+        function IAD_UIFigureCloseRequest(app, event)
+            
+            try
+                app.Spec.closeSpec;
+            catch
+            end
+
+            warning('off','MATLAB:rmpath:DirNotFound')
+            rmpath("./hardware/")
+            warning('on','MATLAB:rmpath:DirNotFound')
+
+            delete(app)
+
+        end
+
+        % Button pushed function: ConnectButton
+        function ConnectButtonPushed(app, event)
+            
+            [app.Spec, status] = app.Spec.initSpec;
+            
+            if status ~= 1
+                app.Initialized = false;
+                app.ConnectedLamp.Color = app.LampOff;
+                app.EnableAll("off");
+
+            else
+                app.Initialized = true;
+                app.ConnectedLamp.Color = app.LampOn;
+                app.EnableAll("on");
+
+                app.Px = (0:(app.Spec.NumPixels-1))';
+                [app.DarkData, app.RawData] = deal(zeros(size(app.Px)));                
+                app.UIAxes.XLim = ...
+                    [min(app.Spec.WvArray), max(app.Spec.WvArray)];
+            end
+
+        end
+
+        % Button pushed function: AutoexposeButton
+        function AutoexposeButtonPushed(app, event)
+            
+            autoX = false;
+            tries = 0;
+            maxsig = 0;
+
+            app.SetIntTime(app.InttimeEditField.Value);
+            while ~autoX
+            
+                thisIntTime = app.InttimeEditField.Value;
+                app.RawData = app.Acquire;
+                oldmax = maxsig;
+                    maxsig = max(app.RawData);
+    
+                if maxsig > 10000 && maxsig < 65535
+                    app.SetIntTime(min(65535, max(50, ...
+                        round((63000/maxsig)*thisIntTime))));
+                    app.RawData = app.Acquire;
+                    autoX = true;
+                        
+                elseif maxsig <= 10000 
+                    if thisIntTime < 65535
+
+                        if tries >= 2 && maxsig/oldmax <= 2                            
+                            uialert(app.IAD_UIFigure, ...
+                                ["Weak signal detected."; ...
+                                "Autoexpose failed."], "No Signal")
+                            autoX = true;
+                        else
+                            app.SetIntTime(min(10*thisIntTime, 65535));
+                            tries = tries+1;
+                        end
+
+                    end
+
+                elseif maxsig >= 65000
+                    if thisIntTime == 50
+                        uialert(app.IAD_UIFigure, ...
+                            "Saturation Detected", "Saturated");
+                        autoX = true;
+
+                    elseif maxsig == 65535
+                        app.SetIntTime(max(50, round(0.3*thisIntTime)));
+
+                    else
+                        app.SetIntTime(min(65535, max(50, ...
+                            round((63000/maxsig)*thisIntTime))));
+
+                    end                                                            
+
+                end
+            end
+            app.PlotData;
+
+        end
+
+        % Button pushed function: AcquireDarkButton
+        function AcquireDarkButtonPushed(app, event)
+            
+            app.DarkData = app.Acquire;
+            app.DarkLamp.Color = app.LampOn;
+            app.HasDark = true;
+            app.PlotDarkData;
+
+        end
+
+        % Button pushed function: SaveButton
+        function SaveButtonPushed(app, event)
+            
+            if not(app.HasDark)
+                uiconfirm(app.IAD_UI,'No valid dark data! Continue?', ...
+                    'Zero Dark Thirty','Icon','warning')
+            end
+
+            fname = fullfile("rawdata", ...
+                app.OutputNameEditField.Value + ".txt");
+
+            d = dir(fname);
+            if ~isempty(d)
+                selection = uiconfirm(app.IAD_UIFigure, ...
+                    'Overwrite Saved Data?', 'Confirm Overwrite',...
+                    'Icon','warning');
+                if strcmp(selection, "OK")
+                    writematrix( ...
+                        [app.Px, app.Spec.WvArray, ...
+                        (app.RawData-app.DarkData)./ ...
+                        (app.InttimeEditField.Value/1000)], ...
+                        fname);
+                    uialert(app.IAD_UIFigure, "File Saved", "", ...
+                        "Icon", "Success")
+                else
+                    uialert(app.IAD_UIFigure, "File not saved.", "", ...
+                        "Icon", "Warning")
+                end
+            else
+                writematrix( ...
+                    [app.Px,app.Spec.WvArray, ...
+                    (app.RawData-app.DarkData)./ ...
+                    (app.InttimeEditField.Value/1000)], ...
+                    fname);
+                uialert(app.IAD_UIFigure, ...
+                    "File Saved", "", "Icon", "Success")
+            end
+
+
+        end
+
+        % Value changed function: SlidesPresentSwitch
+        function SlidesPresentSwitchValueChanged(app, event)
+            
+            switch app.SlidesPresentSwitch.Value
+                case ("No")
+                    app.SlideIndexofRefractionEditField.Enable = "off";
+                    app.SlideThicknessmmEditField.Enable = "off";
+                case ("Yes")
+                    app.SlideIndexofRefractionEditField.Enable = "on";
+                    app.SlideThicknessmmEditField.Enable = "on";
+            end  
+            
+        end
+
+        % Selection changed function: SystemTypeButtonGroup
+        function SystemTypeButtonGroupSelectionChanged(app, event)
+
+            app.IadInputHeader = ...
+                app.SystemTypeButtonGroup.SelectedObject.Tag + ".txt";
+            
+        end
+
+        % Button pushed function: SelectDirButton
+        function SelectDirButtonPushed(app, event)
+            
+            % Try to begin in "rawata" folder colocated with app. 
+            app.RawDir = uigetdir(app.RawDir);
+            
+            app.PopulateListBoxes;
+            %Bring app back to the front
+            focus(app.IAD_UIFigure)
+
+        end
+
+        % Button pushed function: CalculateButton
+        function CalculateButtonPushed(app, event)
+            
+            err = app.VerifyData;
+            if isempty(err)
+                app.GatherValues;
+                app.PlotCorrectedData;
+                app.WriteInputFile;
+            
+                commandwindow
+
+                % Orange text hack from Yair Altman/Carsten Allefeld
+                fprintf('\nUsing Parameters from: [\b%s]\b', ...
+                    app.IadInputHeader);
+                fprintf('\nCalculating OPs for [\b%g]\b wavelengths.\n', ...
+                    numel(app.Wv(1:app.StepSizeEditField.Value:end)));
+
+                cmd = "iad -g " + app.AnisotropyEditField.Value + ...
+                    " -o " + fullfile(app.IadOutDir, ...
+                    app.SaveFileNameEditField.Value+"_out.txt") + ...
+                    fullfile(" " + app.IadOutDir, app.IadInputFileName);
+
+                if ispc
+                    system(cmd);
+                    app.PlotOPs;
+                else
+                    error("*ix systems not tested yet")
+                end
+
+                focus(app.IAD_UIFigure)
+            end
+
+        end
+
+        % Button pushed function: ResetButton
+        function ResetButtonPushed(app, event)
+            
+            % Clear DataDir
+            app.DataDirectoryText.Text = "";
+            % Clear list boxes
+            [app.RMeasListbox.Items, ...
+                app.TMeasListbox.Items, ...
+                app.RStdListbox.Items] = deal("");
+
+            % Reset input parameters
+            app.AnisotropyEditField.Value = 0.7;
+            app.SampleThicknessmmEditField.Value = 2;
+            app.SampleIndexofRefractionEditField.Value = 1.33;
+            app.StepSizeEditField.Value = 1;
+
+            % Slide Value Panel
+            app.SlideThicknessmmEditField.Value = 1.23;
+            app.SlideIndexofRefractionEditField.Value = 1.56;
+            app.SlidesPresentSwitch.Value = "No";
+            app.SlidesPresentSwitchValueChanged;
+
+        end
+
+        % Button down function: ProcessingTab
+        function ProcessingTabButtonDown(app, event)
+            app.PopulateListBoxes
+        end
+    end
+
+    % Component initialization
+    methods (Access = private)
+
+        % Create UIFigure and components
+        function createComponents(app)
+
+            % Create IAD_UIFigure and hide until all components are created
+            app.IAD_UIFigure = uifigure('Visible', 'off');
+            app.IAD_UIFigure.Position = [40 80 1460 800];
+            app.IAD_UIFigure.Name = 'MATLAB App';
+            app.IAD_UIFigure.CloseRequestFcn = createCallbackFcn(app, @IAD_UIFigureCloseRequest, true);
+
+            % Create TabGroup
+            app.TabGroup = uitabgroup(app.IAD_UIFigure);
+            app.TabGroup.Position = [20 12 1422 779];
+
+            % Create AcquisitionTab
+            app.AcquisitionTab = uitab(app.TabGroup);
+            app.AcquisitionTab.Title = 'Acquisition';
+            app.AcquisitionTab.BackgroundColor = [0.8 0.8 0.8];
+
+            % Create UIAxes
+            app.UIAxes = uiaxes(app.AcquisitionTab);
+            title(app.UIAxes, 'No Data')
+            xlabel(app.UIAxes, 'Wavelength (nm)')
+            ylabel(app.UIAxes, 'Counts')
+            app.UIAxes.YLim = [-10 65535];
+            app.UIAxes.GridLineWidth = 1.5;
+            app.UIAxes.Color = [0.149 0.149 0.149];
+            app.UIAxes.GridColor = [1 1 0];
+            app.UIAxes.MinorGridColor = [1 1 0];
+            app.UIAxes.XGrid = 'on';
+            app.UIAxes.YGrid = 'on';
+            app.UIAxes.FontSize = 14;
+            app.UIAxes.Position = [315 62 1077 654];
+
+            % Create InttimeEditField
+            app.InttimeEditField = uieditfield(app.AcquisitionTab, 'numeric');
+            app.InttimeEditField.Limits = [50 65535];
+            app.InttimeEditField.RoundFractionalValues = 'on';
+            app.InttimeEditField.ValueDisplayFormat = '%.8g';
+            app.InttimeEditField.ValueChangedFcn = createCallbackFcn(app, @InttimeEditFieldValueChanged, true);
+            app.InttimeEditField.HorizontalAlignment = 'center';
+            app.InttimeEditField.Enable = 'off';
+            app.InttimeEditField.Position = [114 428 65 22];
+            app.InttimeEditField.Value = 50;
+
+            % Create AcquireDarkButton
+            app.AcquireDarkButton = uibutton(app.AcquisitionTab, 'push');
+            app.AcquireDarkButton.ButtonPushedFcn = createCallbackFcn(app, @AcquireDarkButtonPushed, true);
+            app.AcquireDarkButton.Enable = 'off';
+            app.AcquireDarkButton.Position = [49 279 204 32];
+            app.AcquireDarkButton.Text = 'Acquire Dark';
+
+            % Create AutoexposeButton
+            app.AutoexposeButton = uibutton(app.AcquisitionTab, 'push');
+            app.AutoexposeButton.ButtonPushedFcn = createCallbackFcn(app, @AutoexposeButtonPushed, true);
+            app.AutoexposeButton.Enable = 'off';
+            app.AutoexposeButton.Position = [49 389 204 32];
+            app.AutoexposeButton.Text = 'Autoexpose';
+
+            % Create AcquireDataButton
+            app.AcquireDataButton = uibutton(app.AcquisitionTab, 'push');
+            app.AcquireDataButton.ButtonPushedFcn = createCallbackFcn(app, @AcquireDataButtonPushed, true);
+            app.AcquireDataButton.Enable = 'off';
+            app.AcquireDataButton.Position = [49 239 204 32];
+            app.AcquireDataButton.Text = 'Acquire Data';
+
+            % Create OutputNameEditField
+            app.OutputNameEditField = uieditfield(app.AcquisitionTab, 'text');
+            app.OutputNameEditField.Enable = 'off';
+            app.OutputNameEditField.Position = [49 145 204 22];
+            app.OutputNameEditField.Value = 'Intralipid_T';
+
+            % Create SaveButton
+            app.SaveButton = uibutton(app.AcquisitionTab, 'push');
+            app.SaveButton.ButtonPushedFcn = createCallbackFcn(app, @SaveButtonPushed, true);
+            app.SaveButton.Enable = 'off';
+            app.SaveButton.Position = [49 106 204 32];
+            app.SaveButton.Text = 'Save';
+
+            % Create ConnectButton
+            app.ConnectButton = uibutton(app.AcquisitionTab, 'push');
+            app.ConnectButton.ButtonPushedFcn = createCallbackFcn(app, @ConnectButtonPushed, true);
+            app.ConnectButton.BackgroundColor = [0.9608 0.9608 0.9608];
+            app.ConnectButton.Enable = 'off';
+            app.ConnectButton.Position = [90 517 115 90];
+            app.ConnectButton.Text = {'CONNECT'; 'TO'; 'SPECTROMETER'};
+
+            % Create ConnectedLamp
+            app.ConnectedLamp = uilamp(app.AcquisitionTab);
+            app.ConnectedLamp.Position = [215 552 20 20];
+            app.ConnectedLamp.Color = [0.6 0.6 0.6];
+
+            % Create DarkLamp
+            app.DarkLamp = uilamp(app.AcquisitionTab);
+            app.DarkLamp.Position = [261 284 20 20];
+            app.DarkLamp.Color = [0.6 0.6 0.6];
+
+            % Create SaturatedLamp
+            app.SaturatedLamp = uilamp(app.AcquisitionTab);
+            app.SaturatedLamp.Position = [1344 22 20 20];
+            app.SaturatedLamp.Color = [0.6 0.6 0.6];
+
+            % Create OutputNameEditFieldLabel
+            app.OutputNameEditFieldLabel = uilabel(app.AcquisitionTab);
+            app.OutputNameEditFieldLabel.HorizontalAlignment = 'right';
+            app.OutputNameEditFieldLabel.Position = [109 166 76 22];
+            app.OutputNameEditFieldLabel.Text = 'Output Name';
+
+            % Create IntegrationTimemsEditFieldLabel
+            app.IntegrationTimemsEditFieldLabel = uilabel(app.AcquisitionTab);
+            app.IntegrationTimemsEditFieldLabel.HorizontalAlignment = 'right';
+            app.IntegrationTimemsEditFieldLabel.Position = [89 449 118 22];
+            app.IntegrationTimemsEditFieldLabel.Text = 'Integration Time (ms)';
+
+            % Create SaturatedLampLabel
+            app.SaturatedLampLabel = uilabel(app.AcquisitionTab);
+            app.SaturatedLampLabel.HorizontalAlignment = 'right';
+            app.SaturatedLampLabel.FontSize = 14;
+            app.SaturatedLampLabel.FontColor = [0.502 0.502 0.502];
+            app.SaturatedLampLabel.Position = [1270 21 66 22];
+            app.SaturatedLampLabel.Text = 'Saturated';
+
+            % Create ProcessingTab
+            app.ProcessingTab = uitab(app.TabGroup);
+            app.ProcessingTab.Title = 'Processing';
+            app.ProcessingTab.BackgroundColor = [0.8 0.8 0.8];
+            app.ProcessingTab.ButtonDownFcn = createCallbackFcn(app, @ProcessingTabButtonDown, true);
+
+            % Create RawAxes
+            app.RawAxes = uiaxes(app.ProcessingTab);
+            xlabel(app.RawAxes, 'Wavelength (nm)')
+            ylabel(app.RawAxes, 'Calibrated Reflectance/Transmittance')
+            app.RawAxes.FontSize = 13.3333333333333;
+            app.RawAxes.NextPlot = 'replace';
+            app.RawAxes.Tag = 'axes1';
+            app.RawAxes.Position = [261 354 649 377];
+
+            % Create MuaAxes
+            app.MuaAxes = uiaxes(app.ProcessingTab);
+            xlabel(app.MuaAxes, 'Wavelength (nm)')
+            ylabel(app.MuaAxes, '\mu_A (mm^-^1)')
+            app.MuaAxes.XLim = [400 1100];
+            app.MuaAxes.YLim = [0 0.1];
+            app.MuaAxes.FontSize = 13.3333333333333;
+            app.MuaAxes.NextPlot = 'replace';
+            app.MuaAxes.Tag = 'axes2';
+            app.MuaAxes.Position = [925 395 480 336];
+
+            % Create MuspAxes
+            app.MuspAxes = uiaxes(app.ProcessingTab);
+            xlabel(app.MuspAxes, 'Wavelength (nm)')
+            ylabel(app.MuspAxes, '\mu_S'' (mm^-^1)')
+            app.MuspAxes.FontSize = 13.3333333333333;
+            app.MuspAxes.NextPlot = 'replace';
+            app.MuspAxes.Tag = 'axes3';
+            app.MuspAxes.Position = [925 54 480 323];
+
+            % Create CalculateButton
+            app.CalculateButton = uibutton(app.ProcessingTab, 'push');
+            app.CalculateButton.ButtonPushedFcn = createCallbackFcn(app, @CalculateButtonPushed, true);
+            app.CalculateButton.Tag = 'Calculate';
+            app.CalculateButton.FontSize = 10.6666666666667;
+            app.CalculateButton.Position = [24 52 93 40];
+            app.CalculateButton.Text = 'Calculate';
+
+            % Create ResetButton
+            app.ResetButton = uibutton(app.ProcessingTab, 'push');
+            app.ResetButton.ButtonPushedFcn = createCallbackFcn(app, @ResetButtonPushed, true);
+            app.ResetButton.Tag = 'reset';
+            app.ResetButton.FontSize = 10.6666666666667;
+            app.ResetButton.Position = [129 52 95 40];
+            app.ResetButton.Text = 'Reset';
+
+            % Create SaveFileNameEditField
+            app.SaveFileNameEditField = uieditfield(app.ProcessingTab, 'text');
+            app.SaveFileNameEditField.Position = [29 99 191 22];
+            app.SaveFileNameEditField.Value = 'test';
+
+            % Create SaveFileNameEditFieldLabel
+            app.SaveFileNameEditFieldLabel = uilabel(app.ProcessingTab);
+            app.SaveFileNameEditFieldLabel.HorizontalAlignment = 'right';
+            app.SaveFileNameEditFieldLabel.Position = [29 124 90 22];
+            app.SaveFileNameEditFieldLabel.Text = 'Save File Name';
+
+            % Create DataDirectoryText
+            app.DataDirectoryText = uilabel(app.ProcessingTab);
+            app.DataDirectoryText.Tag = 'text9';
+            app.DataDirectoryText.HorizontalAlignment = 'center';
+            app.DataDirectoryText.VerticalAlignment = 'top';
+            app.DataDirectoryText.WordWrap = 'on';
+            app.DataDirectoryText.FontSize = 10.6666666666667;
+            app.DataDirectoryText.Position = [7 126 233 79];
+            app.DataDirectoryText.Text = '';
+
+            % Create SelectDirButton
+            app.SelectDirButton = uibutton(app.ProcessingTab, 'push');
+            app.SelectDirButton.ButtonPushedFcn = createCallbackFcn(app, @SelectDirButtonPushed, true);
+            app.SelectDirButton.Tag = 'pushbutton3';
+            app.SelectDirButton.FontSize = 10.6666666666667;
+            app.SelectDirButton.Position = [72 218 101 43];
+            app.SelectDirButton.Text = {'Select Raw Data'; 'Directory'};
+
+            % Create uipanel2
+            app.uipanel2 = uipanel(app.ProcessingTab);
+            app.uipanel2.Title = 'Slide/Cuvette Parameters';
+            app.uipanel2.Tag = 'uipanel2';
+            app.uipanel2.FontSize = 10.6666666666667;
+            app.uipanel2.Position = [7 278 236 151];
+
+            % Create SlideThicknessmmEditFieldLabel
+            app.SlideThicknessmmEditFieldLabel = uilabel(app.uipanel2);
+            app.SlideThicknessmmEditFieldLabel.HorizontalAlignment = 'right';
+            app.SlideThicknessmmEditFieldLabel.Position = [33 55 120 22];
+            app.SlideThicknessmmEditFieldLabel.Text = 'Slide Thickness (mm)';
+
+            % Create SlideThicknessmmEditField
+            app.SlideThicknessmmEditField = uieditfield(app.uipanel2, 'numeric');
+            app.SlideThicknessmmEditField.Limits = [0 100];
+            app.SlideThicknessmmEditField.Position = [164 55 48 22];
+            app.SlideThicknessmmEditField.Value = 1.23;
+
+            % Create SlideIndexofRefractionEditFieldLabel
+            app.SlideIndexofRefractionEditFieldLabel = uilabel(app.uipanel2);
+            app.SlideIndexofRefractionEditFieldLabel.HorizontalAlignment = 'right';
+            app.SlideIndexofRefractionEditFieldLabel.Position = [15 16 136 22];
+            app.SlideIndexofRefractionEditFieldLabel.Text = 'Slide Index of Refraction';
+
+            % Create SlideIndexofRefractionEditField
+            app.SlideIndexofRefractionEditField = uieditfield(app.uipanel2, 'numeric');
+            app.SlideIndexofRefractionEditField.Position = [162 16 50 22];
+            app.SlideIndexofRefractionEditField.Value = 1.56;
+
+            % Create SlidesPresentSwitchLabel
+            app.SlidesPresentSwitchLabel = uilabel(app.uipanel2);
+            app.SlidesPresentSwitchLabel.HorizontalAlignment = 'center';
+            app.SlidesPresentSwitchLabel.Position = [33 96 89 22];
+            app.SlidesPresentSwitchLabel.Text = 'Slides Present?';
+
+            % Create SlidesPresentSwitch
+            app.SlidesPresentSwitch = uiswitch(app.uipanel2, 'slider');
+            app.SlidesPresentSwitch.Items = {'No', 'Yes'};
+            app.SlidesPresentSwitch.ValueChangedFcn = createCallbackFcn(app, @SlidesPresentSwitchValueChanged, true);
+            app.SlidesPresentSwitch.Position = [165 98 38 17];
+            app.SlidesPresentSwitch.Value = 'Yes';
+
+            % Create uipanel1
+            app.uipanel1 = uipanel(app.ProcessingTab);
+            app.uipanel1.Title = 'Input Parameters';
+            app.uipanel1.Tag = 'uipanel1';
+            app.uipanel1.FontSize = 10.6666666666667;
+            app.uipanel1.Position = [7 437 236 172];
+
+            % Create AnisotropyEditFieldLabel
+            app.AnisotropyEditFieldLabel = uilabel(app.uipanel1);
+            app.AnisotropyEditFieldLabel.HorizontalAlignment = 'right';
+            app.AnisotropyEditFieldLabel.Position = [93 120 62 22];
+            app.AnisotropyEditFieldLabel.Text = 'Anisotropy';
+
+            % Create AnisotropyEditField
+            app.AnisotropyEditField = uieditfield(app.uipanel1, 'numeric');
+            app.AnisotropyEditField.Limits = [-1 1];
+            app.AnisotropyEditField.Position = [164 120 48 22];
+            app.AnisotropyEditField.Value = 0.7;
+
+            % Create SampleThicknessmmEditFieldLabel
+            app.SampleThicknessmmEditFieldLabel = uilabel(app.uipanel1);
+            app.SampleThicknessmmEditFieldLabel.HorizontalAlignment = 'right';
+            app.SampleThicknessmmEditFieldLabel.Position = [21 84 134 22];
+            app.SampleThicknessmmEditFieldLabel.Text = 'Sample Thickness (mm)';
+
+            % Create SampleThicknessmmEditField
+            app.SampleThicknessmmEditField = uieditfield(app.uipanel1, 'numeric');
+            app.SampleThicknessmmEditField.Limits = [0 100];
+            app.SampleThicknessmmEditField.Position = [164 84 48 22];
+            app.SampleThicknessmmEditField.Value = 2;
+
+            % Create SampleIndexofRefractionEditFieldLabel
+            app.SampleIndexofRefractionEditFieldLabel = uilabel(app.uipanel1);
+            app.SampleIndexofRefractionEditFieldLabel.HorizontalAlignment = 'right';
+            app.SampleIndexofRefractionEditFieldLabel.Position = [3 48 150 22];
+            app.SampleIndexofRefractionEditFieldLabel.Text = 'Sample Index of Refraction';
+
+            % Create SampleIndexofRefractionEditField
+            app.SampleIndexofRefractionEditField = uieditfield(app.uipanel1, 'numeric');
+            app.SampleIndexofRefractionEditField.Limits = [0 Inf];
+            app.SampleIndexofRefractionEditField.Position = [162 48 50 22];
+            app.SampleIndexofRefractionEditField.Value = 1.33;
+
+            % Create StepSizeEditFieldLabel
+            app.StepSizeEditFieldLabel = uilabel(app.uipanel1);
+            app.StepSizeEditFieldLabel.HorizontalAlignment = 'right';
+            app.StepSizeEditFieldLabel.Position = [95 12 56 22];
+            app.StepSizeEditFieldLabel.Text = 'Step Size';
+
+            % Create StepSizeEditField
+            app.StepSizeEditField = uieditfield(app.uipanel1, 'numeric');
+            app.StepSizeEditField.Limits = [1 Inf];
+            app.StepSizeEditField.RoundFractionalValues = 'on';
+            app.StepSizeEditField.ValueDisplayFormat = '%.u';
+            app.StepSizeEditField.Position = [162 12 48 22];
+            app.StepSizeEditField.Value = 1;
+
+            % Create RMeasListbox
+            app.RMeasListbox = uilistbox(app.ProcessingTab);
+            app.RMeasListbox.Items = {};
+            app.RMeasListbox.Position = [283 20 203 260];
+            app.RMeasListbox.Value = {};
+
+            % Create ReflectanceListBoxLabel
+            app.ReflectanceListBoxLabel = uilabel(app.ProcessingTab);
+            app.ReflectanceListBoxLabel.HorizontalAlignment = 'right';
+            app.ReflectanceListBoxLabel.Position = [284 279 68 22];
+            app.ReflectanceListBoxLabel.Text = 'Reflectance';
+
+            % Create TMeasListbox
+            app.TMeasListbox = uilistbox(app.ProcessingTab);
+            app.TMeasListbox.Items = {};
+            app.TMeasListbox.Position = [495 20 203 260];
+            app.TMeasListbox.Value = {};
+
+            % Create TransmittanceLabel
+            app.TransmittanceLabel = uilabel(app.ProcessingTab);
+            app.TransmittanceLabel.HorizontalAlignment = 'right';
+            app.TransmittanceLabel.Position = [495 279 81 22];
+            app.TransmittanceLabel.Text = 'Transmittance';
+
+            % Create StandardReflectanceLabel
+            app.StandardReflectanceLabel = uilabel(app.ProcessingTab);
+            app.StandardReflectanceLabel.HorizontalAlignment = 'right';
+            app.StandardReflectanceLabel.Position = [714 279 120 22];
+            app.StandardReflectanceLabel.Text = 'Reflectance Standard';
+
+            % Create RStdListbox
+            app.RStdListbox = uilistbox(app.ProcessingTab);
+            app.RStdListbox.Items = {};
+            app.RStdListbox.Position = [707 20 203 260];
+            app.RStdListbox.Value = {};
+
+            % Create SystemTypeButtonGroup
+            app.SystemTypeButtonGroup = uibuttongroup(app.ProcessingTab);
+            app.SystemTypeButtonGroup.SelectionChangedFcn = createCallbackFcn(app, @SystemTypeButtonGroupSelectionChanged, true);
+            app.SystemTypeButtonGroup.Title = 'System Type';
+            app.SystemTypeButtonGroup.Position = [7 620 236 48];
+
+            % Create SingleButton
+            app.SingleButton = uiradiobutton(app.SystemTypeButtonGroup);
+            app.SingleButton.Tag = 'SingleSphereParams';
+            app.SingleButton.Text = 'Single';
+            app.SingleButton.Position = [11 2 58 22];
+            app.SingleButton.Value = true;
+
+            % Create DualButton
+            app.DualButton = uiradiobutton(app.SystemTypeButtonGroup);
+            app.DualButton.Tag = 'DualSphereParams';
+            app.DualButton.Text = 'Dual';
+            app.DualButton.Position = [81 2 65 22];
+
+            % Create CustomButton
+            app.CustomButton = uiradiobutton(app.SystemTypeButtonGroup);
+            app.CustomButton.Tag = 'CustomSphereParams';
+            app.CustomButton.Text = 'Custom';
+            app.CustomButton.Position = [151 2 65 22];
+
+            % Show the figure after all components are created
+            app.IAD_UIFigure.Visible = 'on';
+        end
+    end
+
+    % App creation and deletion
+    methods (Access = public)
+
+        % Construct app
+        function app = IAD_acquire
+
+            runningApp = getRunningApp(app);
+
+            % Check for running singleton app
+            if isempty(runningApp)
+
+                % Create UIFigure and components
+                createComponents(app)
+
+                % Register the app with App Designer
+                registerApp(app, app.IAD_UIFigure)
+
+                % Execute the startup function
+                runStartupFcn(app, @startupFcn)
+            else
+
+                % Focus the running singleton app
+                figure(runningApp.IAD_UIFigure)
+
+                app = runningApp;
+            end
+
+            if nargout == 0
+                clear app
+            end
+        end
+
+        % Code that executes before app deletion
+        function delete(app)
+
+            % Delete UIFigure when app is deleted
+            delete(app.IAD_UIFigure)
+        end
+    end
+end]]></w:t></w:r></w:p></w:body></w:document>
