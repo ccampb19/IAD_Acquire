@@ -37,7 +37,7 @@ classdef bwtekSpec < spectrometer
             
         end
 
-        function [obj,status] = setIntegrationTime(~,inttime)
+        function [obj,status] = setIntegrationTime(obj,inttime)
             disp("inttime: " + inttime)
             status = calllib('bwtekusb','bwtekSetTimeUSB',inttime,0);
 

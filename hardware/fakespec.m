@@ -1,4 +1,4 @@
-classdef fakespec < spectrometer
+classdef fakeSpec < spectrometer
     %FAKESPEC A dummy spectrometer class that returns answers for testing.
 
     % Properties and method prototypes are listed in spectrometer.m
