@@ -9,7 +9,7 @@ Matlab binary files like the .mlapp contained herein don't play nice with Github
     `comparisons.ExternalSCMLink.setupGitConfig()`  
 * Additionally, we extract the contents of the mlapp file to make them human-readable in git before committing. The app programming is still done in App Designer, but viewing differences
  between commits can now be done outside of matlab, using the files in the .extracted directory. To enable this behavior, add the file `pre-commit` (no extension) to `./git/hooks`,
- containing the following code (note: this assumes tar is located in `C:\Windows\System32` and won't complain about the .mlapp not being a tar file. Adjust the path as needed).
+ containing the following code:
 ```
 #!/bin/sh
 
