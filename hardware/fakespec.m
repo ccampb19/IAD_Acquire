@@ -9,6 +9,7 @@ classdef fakeSpec < spectrometer
             %FAKESPEC Construct an instance of this class
             obj.NumPixels = 1024;
             obj.WvArray = zeros(obj.NumPixels,1);
+            obj.MinIntTime = 100;
         end
 
         function [obj,status] = initSpec(obj)

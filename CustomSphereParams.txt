@@ -1,26 +1,26 @@
 IAD1 		# Must be first four characters
 
-1.33            # Index of refraction of the sample 
+1.43            # Index of refraction of the sample 
 1.56            # Index of refraction of the top and bottom slides 
 2.00            # [mm] Thickness of sample 
 1.23            # [mm] Thickness of slides 
-4.00            # [mm] Diameter of illumination beam 
-0.99            # Reflectivity of the reflectance calibration standard 
+6.00            # [mm] Diameter of illumination beam 
+0.9885            # Reflectivity of the reflectance calibration standard 
 
-2               # Number of spheres used for the measurement
+1               # Number of spheres used for the measurement
 
 		# Properties of sphere used for reflectance measurements
-101.6		# [mm] Sphere Diameter  (in * 25.4 mm/in)
-25.40		# [mm] Sample Port Diameter
-25.40          	# [mm] Entrance Port Diameter
-3.00		# [mm] Detector Port Diameter
-0.990		# Reflectivity of the sphere wall
+100.0		# [mm] Sphere Diameter  (in * 25.4 mm/in)
+12.3		# [mm] Sample Port Diameter
+12.3          	# [mm] Entrance Port Diameter
+1.00		# [mm] Detector Port Diameter
+0.9885		# Reflectivity of the sphere wall
 
 		# Properties of sphere for transmittance measurements
-101.6		# [mm] Sphere Diameter  (in * 25.4 mm/in)
-25.40		# [mm] Sample Port Diameter
-25.40         	# [mm] Entrance Port Diameter
-3.00		# [mm] Detector Port Diameter
-0.990		# Reflectivity of the sphere wall
+100.0		# [mm] Sphere Diameter  (in * 25.4 mm/in)
+12.3		# [mm] Sample Port Diameter
+0.0         	# [mm] Entrance Port Diameter
+1.00		# [mm] Detector Port Diameter
+0.9885		# Reflectivity of the sphere wall
 
 2                # Two measurements, i.e., M_R & M_T

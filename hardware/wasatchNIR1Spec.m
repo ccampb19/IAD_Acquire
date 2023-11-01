@@ -21,6 +21,7 @@ classdef wasatchNIR1Spec < spectrometer
             obj.ModelNo = obj.Handle.model;
             obj.NumPixels = obj.Handle.pixels;
             obj.WvArray = obj.Handle.wavelengths;
+            obj.MinIntTime = int8(1); % Replace with a number (ms) when found
             status = 1;
             
         end

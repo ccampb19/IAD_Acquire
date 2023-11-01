@@ -26,6 +26,9 @@ classdef bwtekSpec < spectrometer
                     %     'a0',3.20234E+2,'a1',8.47811E-1,'a2',-1.03570E-4, ...
                     %     'a3',7.79542E-10,'b0',-3.67543E+2,'b1',1.11888E+0, ...
                     %     'b2',5.91434E-5,'b3',8.96565E-8);
+
+                obj.MinIntTime = 50;
+
         end
 
         function [obj,status] = initSpec(obj)

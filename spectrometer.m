@@ -8,6 +8,8 @@ classdef spectrometer
         % Mandatory
         NumPixels (1,1) double  % Number of pixels. Often 512,1024,
         WvArray (:,1) double    % All wavelengths captured (for plotting)
+        MinIntTime (1,1) double % Minimum integration time in ms
+        MaxIntTime (1,1) double = 65535; % Max integration time in ms
 
         % Optional...
         ModelNo string  % Spectrometer Nomenclature, e.g, "BTC621E-1024"
