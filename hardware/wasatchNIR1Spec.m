@@ -13,7 +13,7 @@ classdef wasatchNIR1Spec < spectrometer
 
         function [obj,status] = initSpec(obj)
             NET.addAssembly( ...
-                'C:\Program Files\Wasatch Photonics\Wasatch.NET\WasatchNET.dll');
+                "C:\Program Files\Wasatch Photonics\Wasatch.NET\WasatchNET.dll");
             obj.Driver = WasatchNET.Driver.getInstance();
             obj.Driver.openAllSpectrometers();
             obj.Handle = obj.Driver.getSpectrometer(0);
@@ -21,7 +21,7 @@ classdef wasatchNIR1Spec < spectrometer
             obj.ModelNo = obj.Handle.model;
             obj.NumPixels = obj.Handle.pixels;
             obj.WvArray = obj.Handle.wavelengths;
-            obj.MinIntTime = int8(1); % Replace with a number (ms) when found
+            obj.MinIntTime = 1;
             status = 1;
             
         end
