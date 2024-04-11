@@ -1,4 +1,5 @@
 # IAD Acquire
+![Screenshot 2024-04-11 113602](https://github.com/ccampb19/IAD_Acquire/assets/43229278/7f8b0623-a8ef-4480-b0ac-0739717d3e89)
 ### Purpose
 This app aims to streamline acquisition and processing of inverse adding-doubling code using Scott Prahl's [Inverse Adding-Doubling code](https://github.com/scottprahl)  
 It necessarily makes some assumptions about the experimental setup, though it could be modified to suit the user's needs. 
